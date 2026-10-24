@@ -11,11 +11,11 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.4 "Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
-#app{display:grid;grid-template-rows:48px 1fr;height:100%}
+#app{display:grid;grid-template-rows:48px minmax(0,1fr);grid-template-columns:minmax(0,1fr);height:100%}
 header{display:flex;align-items:center;gap:6px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);position:relative;z-index:5}
-header h1{font-size:15px;margin:0 auto 0 0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1{flex:1 1 auto;min-width:0;font-size:15px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 header h1 b{color:var(--accent)}
-.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.btn{flex:none;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
 .btn:hover{border-color:#4b5563}
 .btn:disabled{opacity:.4;cursor:default}
 .btn.danger:hover{border-color:var(--enemy);color:#fecaca}
@@ -70,17 +70,31 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .two{display:flex;gap:8px}
 .chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;cursor:pointer}
 .hint{color:var(--muted);font-size:12px;margin:-4px 0 12px}
+#zoomCtl{position:absolute;right:12px;bottom:124px;display:flex;flex-direction:column;gap:4px;padding:4px;background:rgba(27,31,37,.96);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:4}
+#zoomCtl button{width:40px;height:40px;border-radius:8px;border:none;background:transparent;color:var(--text);font:600 20px/1 "Segoe UI",Roboto,Arial,sans-serif;cursor:pointer}
+#zoomCtl button:hover{background:var(--panel2)}
 #toast{position:absolute;left:50%;top:16px;transform:translateX(-50%) translateY(-8px);background:#7f1d1d;color:#fff;border:1px solid #ef4444;padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:20}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #toast.ok{background:#14532d;border-color:#22c55e}
 
+.hsep{font-style:normal}
+@media (max-width:520px){ header h1 b,.hsep{display:none} }
+@media (max-width:380px){ header h1{display:none} header{justify-content:flex-end} }
 @media (max-width:760px){
+  header{gap:4px;padding:0 8px}
   header h1{font-size:13px}
+  .btn{padding:0 8px;height:34px}
+  #bFit{display:none}
+  #zoomCtl{bottom:auto;top:12px;right:12px}
+  #toolbar{bottom:40px;padding:4px;gap:0}
+  .sep{margin:6px 2px}
+  #props{top:auto;bottom:108px;left:8px;right:8px;width:auto;max-height:42%;padding:12px}
+  #settings,#help{left:8px;right:8px;width:auto;top:8px;max-height:calc(100% - 120px);overflow:auto}
+  #status{gap:12px;padding:0 10px}
   .btn .lbl{display:none}
   .tool{min-width:44px}
   .tool span{display:none}
   .tool kbd{display:none}
-  #props{left:12px;right:12px;width:auto;max-height:45%}
   #status .opt{display:none}
 }
 </style>
@@ -88,7 +102,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <body>
 <div id="app">
   <header>
-    <h1><b>Z Route Redemption</b> · <span data-i18n="h1"></span></h1>
+    <h1><b>Z Route Redemption</b><i class="hsep"> · </i><span data-i18n="h1"></span></h1>
     <button class="btn" id="bUndo" data-i18n-title="undoT">↶<span class="lbl" data-i18n="undo"></span></button>
     <button class="btn" id="bRedo" data-i18n-title="redoT">↷<span class="lbl" data-i18n="redo"></span></button>
     <button class="btn" id="bFit" data-i18n-title="fitT">⤢<span class="lbl" data-i18n="fit"></span></button>
@@ -151,6 +165,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
     <div id="help" class="pop"></div>
 
+    <div id="zoomCtl">
+      <button id="zIn" data-i18n-title="zoomIn">+</button>
+      <button id="zOut" data-i18n-title="zoomOut">−</button>
+      <button id="zFit" data-i18n-title="fitT" style="font-size:17px">⤢</button>
+    </div>
+
     <div id="toast"></div>
   </div>
 </div>
@@ -187,7 +207,7 @@ const I18N = {
     docTitle:'Оборона Капитолия — Z Route Redemption', h1:'оборона Капитолия',
     undo:'Отменить', undoT:'Отменить (Ctrl+Z)', redo:'Повторить', redoT:'Повторить (Ctrl+Shift+Z)',
     fit:'Вписать', fitT:'Вписать поле (F)', pngT:'Сохранить картинкой', field:'Поле', fieldT:'Настройки поля',
-    langT:'Язык: русский / английский', helpT:'Управление', clear:'Очистить', clearT:'Удалить все объекты',
+    langT:'Язык: русский / английский', zoomIn:'Приблизить', zoomOut:'Отдалить', helpT:'Управление', clear:'Очистить', clearT:'Удалить все объекты',
     tSelect:'Выбор', tSelectT:'Выбор и перемещение (V)', tAlly:'Своя база', tAllyT:'Своя база 3×3 (1)',
     tEnemy:'Враг', tEnemyT:'Вражеская база 3×3 (2)', tArrow:'Стрелка', tArrowT:'Стрелка направления (A)',
     tArea:'Область', tAreaT:'Область с фоном (R)', tText:'Текст', tTextT:'Текст (T)', tComment:'Коммент', tCommentT:'Комментарий (C)',
@@ -201,7 +221,7 @@ const I18N = {
     help:[['Колесо','Масштаб'],['Пробел + мышь','Двигать карту (или правая / средняя кнопка)'],['V 1 2 A R T C','Инструменты'],
       ['Shift + клик','Добавить к выделению'],['Протянуть по пустому','Выделить рамкой'],['Двойной клик','Редактировать подпись / текст'],
       ['Стрелки','Сдвиг на 1 клетку (Shift — на 5)'],['Ctrl+D','Дублировать'],['Delete','Удалить выделенное'],
-      ['Ctrl+Z / Ctrl+Shift+Z','Отмена / повтор'],['Alt при перетаскивании','Без привязки к сетке (кроме баз)'],['Esc','Снять выделение, инструмент «Выбор»']],
+      ['Ctrl+Z / Ctrl+Shift+Z','Отмена / повтор'],['Два пальца','Масштаб и перемещение на телефоне'],['Палец по пустому месту','Двигать карту на телефоне'],['Alt при перетаскивании','Без привязки к сетке (кроме баз)'],['Esc','Снять выделение, инструмент «Выбор»']],
     zoneLbl:'ЗОНА БЕЗ ЩИТОВ · {0} кл.', capitol:'КАПИТОЛИЙ', capSub:'21×21 · базы ставить нельзя', mud:'ГРЯЗЬ', beyond:'ЗА ГРЯЗЬЮ',
     allyLetter:'С', enemyLetter:'В', allyBase:'Своя база', enemyBase:'Вражеская база', inNoShieldT:'в зоне без щитов',
     pCap:'Нельзя ставить базу на капитолий', pBusy:'Место занято другой базой',
@@ -220,7 +240,7 @@ const I18N = {
     docTitle:'Capitol defense — Z Route Redemption', h1:'Capitol defense',
     undo:'Undo', undoT:'Undo (Ctrl+Z)', redo:'Redo', redoT:'Redo (Ctrl+Shift+Z)',
     fit:'Fit', fitT:'Fit field to screen (F)', pngT:'Save as image', field:'Field', fieldT:'Field settings',
-    langT:'Language: Russian / English', helpT:'Controls', clear:'Clear', clearT:'Delete all objects',
+    langT:'Language: Russian / English', zoomIn:'Zoom in', zoomOut:'Zoom out', helpT:'Controls', clear:'Clear', clearT:'Delete all objects',
     tSelect:'Select', tSelectT:'Select and move (V)', tAlly:'Ally base', tAllyT:'Ally base 3×3 (1)',
     tEnemy:'Enemy', tEnemyT:'Enemy base 3×3 (2)', tArrow:'Arrow', tArrowT:'Direction arrow (A)',
     tArea:'Area', tAreaT:'Filled area (R)', tText:'Text', tTextT:'Text (T)', tComment:'Note', tCommentT:'Comment (C)',
@@ -234,7 +254,7 @@ const I18N = {
     help:[['Wheel','Zoom'],['Space + drag','Pan the map (or right / middle button)'],['V 1 2 A R T C','Tools'],
       ['Shift + click','Add to selection'],['Drag on empty space','Box select'],['Double-click','Edit label / text'],
       ['Arrow keys','Move 1 cell (Shift — 5)'],['Ctrl+D','Duplicate'],['Delete','Delete selected'],
-      ['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],['Alt while dragging','No grid snapping (except bases)'],['Esc','Deselect, Select tool']],
+      ['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],['Two fingers','Zoom and pan on mobile'],['Finger on empty space','Pan the map on mobile'],['Alt while dragging','No grid snapping (except bases)'],['Esc','Deselect, Select tool']],
     zoneLbl:'NO-SHIELD ZONE · {0} cells', capitol:'CAPITOL', capSub:'21×21 · no bases allowed', mud:'MUD', beyond:'OUTSIDE THE MUD',
     allyLetter:'A', enemyLetter:'E', allyBase:'Ally base', enemyBase:'Enemy base', inNoShieldT:'in the no-shield zone',
     pCap:'Bases cannot be placed on the Capitol', pBusy:'Spot is taken by another base',
@@ -671,26 +691,68 @@ function toCell(e){
   const r = svg.getBoundingClientRect();
   return { x: vb.x + (e.clientX - r.left) / view.scale, y: vb.y + (e.clientY - r.top) / view.scale };
 }
+function zoomAt(clientX, clientY, newScale){
+  const r = svg.getBoundingClientRect();
+  const px = vb.x + (clientX - r.left) / view.scale, py = vb.y + (clientY - r.top) / view.scale;
+  const ns = Math.max(1.5, Math.min(60, newScale));
+  view.scale = ns;
+  view.cx = px - (clientX - r.left - r.width/2) / ns;
+  view.cy = py - (clientY - r.top - r.height/2) / ns;
+  updateViewBox();
+}
+function zoomCenter(f){ const r = svg.getBoundingClientRect(); zoomAt(r.left + r.width/2, r.top + r.height/2, view.scale * f); }
 svg.addEventListener('wheel', e => {
   e.preventDefault();
-  const p = toCell(e), r = svg.getBoundingClientRect();
-  const ns = Math.max(1.5, Math.min(60, view.scale * Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015))));
-  view.scale = ns;
-  view.cx = p.x - (e.clientX - r.left - r.width/2) / ns;
-  view.cy = p.y - (e.clientY - r.top - r.height/2) / ns;
-  updateViewBox();
+  zoomAt(e.clientX, e.clientY, view.scale * Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015)));
 }, {passive:false});
 new ResizeObserver(() => updateViewBox()).observe(stage);
 
 /* ---------- Мышь ---------- */
 const snapH = (p,e) => e.altKey ? {x:r2(p.x), y:r2(p.y)} : {x:Math.round(p.x*2)/2, y:Math.round(p.y*2)/2};
 
+const touches = new Map();
+function cancelDrag(){
+  if(!drag) return;
+  if((drag.type === 'move' || drag.type === 'handle') && drag.snap){ state = JSON.parse(drag.snap); }
+  drag = null; svg.classList.remove('panning'); renderAll();
+}
+function pinchInfo(){
+  const [a,b] = [...touches.values()];
+  return { d: Math.hypot(a.x-b.x, a.y-b.y) || 1, mx:(a.x+b.x)/2, my:(a.y+b.y)/2 };
+}
+function placeAt(p, t){
+  if(t === 'ally' || t === 'enemy'){
+    const g = ghostPos(p), prob = baseProblem(g.x, g.y);
+    if(prob){ toast(prob); return; }
+    const o = { id:uid(), type:'base', side:t, x:g.x, y:g.y, label:'' };
+    mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+    return;
+  }
+  const o = t === 'text'
+    ? { id:uid(), type:'text', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defText'), color:lastColor.text, size:2 }
+    : { id:uid(), type:'comment', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defComment'), bg:lastColor.bg, size:1.1 };
+  setTool('select');
+  mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+  focusEditor(true);
+}
 svg.addEventListener('contextmenu', e => e.preventDefault());
 svg.addEventListener('pointerdown', e => {
   if(document.activeElement && props.contains(document.activeElement)) document.activeElement.blur();
   closePops();
   const p = toCell(e);
   try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+  const isTouch = e.pointerType === 'touch';
+  if(isTouch){
+    touches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(touches.size === 2){
+      cancelDrag();
+      const pi = pinchInfo();
+      drag = { type:'pinch', d0:pi.d, s0:view.scale, mx:pi.mx, my:pi.my };
+      return;
+    }
+    if(touches.size > 2) return;
+    hover = null;
+  }
   if(e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)){
     drag = { type:'pan', sx:e.clientX, sy:e.clientY, cx:view.cx, cy:view.cy };
     svg.classList.add('panning'); e.preventDefault(); return;
@@ -717,34 +779,53 @@ svg.addEventListener('pointerdown', e => {
       renderOverlay(); renderProps();
       return;
     }
+    if(isTouch){
+      selected.clear(); renderOverlay(); renderProps();
+      drag = { type:'pan', sx:e.clientX, sy:e.clientY, cx:view.cx, cy:view.cy };
+      return;
+    }
     if(!e.shiftKey) selected.clear();
     drag = { type:'marquee', a:p, b:p };
     renderOverlay(); renderProps();
     return;
   }
-  if(tool === 'ally' || tool === 'enemy'){
-    const g = ghostPos(p), prob = baseProblem(g.x, g.y);
-    if(prob){ toast(prob); return; }
-    const o = { id:uid(), type:'base', side:tool, x:g.x, y:g.y, label:'' };
-    mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+  if(tool === 'ally' || tool === 'enemy' || tool === 'text' || tool === 'comment'){
+    if(isTouch){ drag = { type:'tap', p, sx:e.clientX, sy:e.clientY, cx:view.cx, cy:view.cy, tool, moved:false }; return; }
+    if(tool === 'text' || tool === 'comment') e.preventDefault();
+    placeAt(p, tool);
     return;
   }
   if(tool === 'arrow'){ const a = snapH(p,e); drag = { type:'arrow', a, b:a }; return; }
   if(tool === 'area'){ drag = { type:'area', a:p, b:p }; return; }
-  if(tool === 'text' || tool === 'comment'){
-    e.preventDefault();
-    const o = tool === 'text'
-      ? { id:uid(), type:'text', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defText'), color:lastColor.text, size:2 }
-      : { id:uid(), type:'comment', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defComment'), bg:lastColor.bg, size:1.1 };
-    setTool('select');
-    mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
-    focusEditor(true);
-  }
 });
 
 svg.addEventListener('pointermove', e => {
-  const p = toCell(e); hover = p;
+  if(e.pointerType === 'touch' && touches.has(e.pointerId)) touches.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(drag && drag.type === 'pinch'){
+    if(touches.size < 2) return;
+    const pi = pinchInfo(), r = svg.getBoundingClientRect();
+    // точка поля под начальной серединой остаётся под текущей серединой пальцев
+    const cellX = vb.x + (drag.mx - r.left) / view.scale, cellY = vb.y + (drag.my - r.top) / view.scale;
+    const ns = Math.max(1.5, Math.min(60, drag.s0 * pi.d / drag.d0));
+    view.scale = ns;
+    view.cx = cellX - (pi.mx - r.left - r.width/2) / ns;
+    view.cy = cellY - (pi.my - r.top - r.height/2) / ns;
+    drag.mx = pi.mx; drag.my = pi.my;
+    updateViewBox();
+    return;
+  }
+  const p = toCell(e);
+  if(e.pointerType !== 'touch') hover = p;
   showCoord(p);
+  if(drag && drag.type === 'tap'){
+    if(Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 10) drag.moved = true;
+    if(drag.moved){
+      view.cx = drag.cx - (e.clientX - drag.sx) / view.scale;
+      view.cy = drag.cy - (e.clientY - drag.sy) / view.scale;
+      updateViewBox();
+    }
+    return;
+  }
   if(!drag){ if(tool === 'ally' || tool === 'enemy') renderOverlay(); return; }
   switch(drag.type){
     case 'pan':
@@ -788,10 +869,17 @@ svg.addEventListener('pointermove', e => {
   }
 });
 
-function endDrag(){
+function endDrag(e){
+  if(e && e.pointerType === 'touch'){
+    touches.delete(e.pointerId);
+    if(drag && drag.type === 'pinch'){ if(touches.size < 2) drag = null; return; }
+  }
   const d = drag; drag = null; svg.classList.remove('panning');
   if(!d) return;
   switch(d.type){
+    case 'tap':
+      if(!d.moved && !(e && e.type === 'pointercancel')) placeAt(d.p, d.tool);
+      break;
     case 'move':
       if(d.invalid){
         for(const [id,o0] of d.orig){ const i = state.objects.findIndex(x => x.id === id); if(i >= 0) state.objects[i] = {...o0}; }
@@ -823,7 +911,7 @@ function endDrag(){
 }
 svg.addEventListener('pointerup', endDrag);
 svg.addEventListener('pointercancel', endDrag);
-svg.addEventListener('pointerleave', () => { hover = null; if(!drag) renderOverlay(); $('#sCoord').textContent = t('cell') + ': —'; });
+svg.addEventListener('pointerleave', e => { if(e.pointerType === 'touch') return; hover = null; if(!drag) renderOverlay(); $('#sCoord').textContent = t('cell') + ': —'; });
 svg.addEventListener('dblclick', e => {
   const el = e.target.closest('[data-id]'); if(!el) return;
   selected = new Set([el.dataset.id]); renderOverlay(); renderProps(true); focusEditor(true);
@@ -909,6 +997,8 @@ document.addEventListener('keydown', e => {
   const tools = { KeyV:'select', Digit1:'ally', Digit2:'enemy', KeyA:'arrow', KeyR:'area', KeyT:'text', KeyC:'comment' };
   if(tools[e.code]){ setTool(tools[e.code]); return; }
   if(e.code === 'KeyF') fit();
+  if(e.key === '+' || e.key === '=') zoomCenter(1.25);
+  if(e.key === '-' || e.key === '_') zoomCenter(1/1.25);
 });
 document.addEventListener('keyup', e => { if(e.code === 'Space'){ spaceDown = false; svg.classList.remove('space'); } });
 window.addEventListener('blur', () => { spaceDown = false; svg.classList.remove('space'); });
@@ -919,6 +1009,9 @@ function togglePop(id){ const el = $('#'+id), open = el.style.display === 'block
 $('#bUndo').onclick = undo;
 $('#bRedo').onclick = redo;
 $('#bFit').onclick = fit;
+$('#zIn').onclick = () => zoomCenter(1.4);
+$('#zOut').onclick = () => zoomCenter(1/1.4);
+$('#zFit').onclick = fit;
 $('#bHelp').onclick = () => togglePop('help');
 $('#bLang').onclick = () => setLang(lang === 'ru' ? 'en' : 'ru');
 $('#bSettings').onclick = () => {
