@@ -1,0 +1,981 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Capitol defense — Z Route Redemption</title>
+<style>
+:root{
+  --bg:#101215; --panel:#1b1f25; --panel2:#262b33; --line:#343b45;
+  --text:#e7e9ec; --muted:#9aa3ae; --accent:#f59e0b; --ally:#3b82f6; --enemy:#ef4444;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.4 "Segoe UI",Roboto,Arial,sans-serif;overflow:hidden}
+#app{display:grid;grid-template-rows:48px 1fr;height:100%}
+header{display:flex;align-items:center;gap:6px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);position:relative;z-index:5}
+header h1{font-size:15px;margin:0 auto 0 0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header h1 b{color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font:inherit;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:#4b5563}
+.btn:disabled{opacity:.4;cursor:default}
+.btn.danger:hover{border-color:var(--enemy);color:#fecaca}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1b1206;font-weight:600}
+#stage{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 40%,#181b20,#0d0f12)}
+#board{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+#board.tool-select [data-id]{cursor:move}
+#board [data-handle]{cursor:pointer}
+#board.tool-ally,#board.tool-enemy,#board.tool-arrow,#board.tool-area{cursor:crosshair}
+#board.tool-text,#board.tool-comment{cursor:text}
+#board.space,#board.space *{cursor:grab!important}
+#board.panning,#board.panning *{cursor:grabbing!important}
+
+#toolbar{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;gap:2px;padding:6px;background:rgba(27,31,37,.96);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.45);max-width:calc(100% - 24px);overflow-x:auto}
+.tool{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;padding:7px 8px 6px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;font:inherit;font-size:11px}
+.tool:hover{background:var(--panel2)}
+.tool.active{background:var(--panel2);border-color:var(--accent)}
+.tool svg{width:22px;height:22px}
+.tool kbd{position:absolute;top:3px;right:5px;font:10px/1 monospace;color:var(--muted)}
+.sep{width:1px;background:var(--line);margin:6px 4px}
+
+#status{position:absolute;left:0;right:0;bottom:0;height:32px;display:flex;align-items:center;gap:18px;padding:0 12px;background:var(--panel);border-top:1px solid var(--line);color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden}
+#status .warn{color:#fca5a5}
+#status .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+.pop{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:10}
+#props{top:12px;right:12px;width:270px;display:none;max-height:calc(100% - 150px);overflow:auto}
+#settings{top:54px;right:12px;width:290px;display:none}
+#help{top:54px;right:12px;width:340px;display:none;font-size:13px}
+#help table{border-collapse:collapse;width:100%}
+#help td{padding:3px 0;vertical-align:top}
+#help td:first-child{color:var(--accent);white-space:nowrap;padding-right:10px;font-family:monospace;font-size:12px}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.ph b{font-size:14px}
+.ph span{color:var(--muted);font-size:12px}
+.fld{margin:0 0 12px}
+.fld>label{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:5px}
+input[type=text],input[type=number],textarea,select{width:100%;background:#12151a;border:1px solid var(--line);border-radius:8px;color:var(--text);font:inherit;padding:7px 9px;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent)}
+textarea{min-height:70px;resize:vertical}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.sw{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sw button{width:22px;height:22px;border-radius:6px;border:2px solid transparent;cursor:pointer;padding:0}
+.sw button.on{border-color:#fff}
+.sw input[type=color]{width:26px;height:24px;padding:0;border:none;background:none;cursor:pointer}
+.seg{display:flex;gap:4px}
+.seg button{flex:1}
+.seg .on-ally{border-color:var(--ally);background:#1e3a8a}
+.seg .on-enemy{border-color:var(--enemy);background:#7f1d1d}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.row .btn{flex:1;justify-content:center}
+.two{display:flex;gap:8px}
+.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:13px;cursor:pointer}
+.hint{color:var(--muted);font-size:12px;margin:-4px 0 12px}
+#toast{position:absolute;left:50%;top:16px;transform:translateX(-50%) translateY(-8px);background:#7f1d1d;color:#fff;border:1px solid #ef4444;padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:20}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:#14532d;border-color:#22c55e}
+
+@media (max-width:760px){
+  header h1{font-size:13px}
+  .btn .lbl{display:none}
+  .tool{min-width:44px}
+  .tool span{display:none}
+  .tool kbd{display:none}
+  #props{left:12px;right:12px;width:auto;max-height:45%}
+  #status .opt{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1><b>Z Route Redemption</b> · <span data-i18n="h1"></span></h1>
+    <button class="btn" id="bUndo" data-i18n-title="undoT">↶<span class="lbl" data-i18n="undo"></span></button>
+    <button class="btn" id="bRedo" data-i18n-title="redoT">↷<span class="lbl" data-i18n="redo"></span></button>
+    <button class="btn" id="bFit" data-i18n-title="fitT">⤢<span class="lbl" data-i18n="fit"></span></button>
+    <button class="btn primary" id="bPng" data-i18n-title="pngT">⬇<span class="lbl">PNG</span></button>
+    <button class="btn" id="bSettings" data-i18n-title="fieldT">⚙<span class="lbl" data-i18n="field"></span></button>
+    <button class="btn" id="bLang" data-i18n-title="langT">🌐 <span id="langLbl"></span></button>
+    <button class="btn" id="bHelp" data-i18n-title="helpT">?</button>
+    <button class="btn danger" id="bClear" data-i18n-title="clearT">✕<span class="lbl" data-i18n="clear"></span></button>
+  </header>
+
+  <div id="stage">
+    <svg id="board" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMinYMin meet">
+      <defs id="defs"></defs>
+      <g id="world"></g>
+      <g id="objects"></g>
+      <g id="overlay" pointer-events="none"></g>
+    </svg>
+
+    <div id="toolbar">
+      <button class="tool" data-tool="select" data-i18n-title="tSelectT"><kbd>V</kbd>
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 8.2-6.2 1.6L9.6 19z" fill="currentColor"/></svg><span data-i18n="tSelect"></span></button>
+      <div class="sep"></div>
+      <button class="tool" data-tool="ally" data-i18n-title="tAllyT"><kbd>1</kbd>
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="#1e40af" stroke="#60a5fa" stroke-width="2"/></svg><span data-i18n="tAlly"></span></button>
+      <button class="tool" data-tool="enemy" data-i18n-title="tEnemyT"><kbd>2</kbd>
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" fill="#991b1b" stroke="#f87171" stroke-width="2"/></svg><span data-i18n="tEnemy"></span></button>
+      <div class="sep"></div>
+      <button class="tool" data-tool="arrow" data-i18n-title="tArrowT"><kbd>A</kbd>
+        <svg viewBox="0 0 24 24"><path d="M4 20L17 7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M20 4l-1.5 8-6.5-6.5z" fill="currentColor"/></svg><span data-i18n="tArrow"></span></button>
+      <button class="tool" data-tool="area" data-i18n-title="tAreaT"><kbd>R</kbd>
+        <svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5" fill="rgba(59,130,246,.35)" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2"/></svg><span data-i18n="tArea"></span></button>
+      <button class="tool" data-tool="text" data-i18n-title="tTextT"><kbd>T</kbd>
+        <svg viewBox="0 0 24 24"><path d="M5 5h14v3M12 5v14M9 19h6M5 5v3" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg><span data-i18n="tText"></span></button>
+      <button class="tool" data-tool="comment" data-i18n-title="tCommentT"><kbd>C</kbd>
+        <svg viewBox="0 0 24 24"><path d="M4 4h16v12H10l-5 4v-4H4z" fill="#fde68a" stroke="#a16207" stroke-width="1.4" stroke-linejoin="round"/></svg><span data-i18n="tComment"></span></button>
+    </div>
+
+    <div id="status">
+      <span id="sCoord"></span>
+      <span><i class="dot" style="background:var(--ally)"></i><span data-i18n="allies"></span>: <b id="sAlly">0</b></span>
+      <span><i class="dot" style="background:var(--enemy)"></i><span data-i18n="enemies"></span>: <b id="sEnemy">0</b></span>
+      <span id="sWarn" class="warn"></span>
+      <span class="opt" style="margin-left:auto"><span data-i18n="zoom"></span>: <b id="sZoom">100%</b></span>
+    </div>
+
+    <div id="props" class="pop"></div>
+
+    <div id="settings" class="pop">
+      <div class="ph"><b data-i18n="setTitle"></b></div>
+      <div class="fld"><label data-i18n="setBw"></label><input type="number" id="setBw" min="0" max="40" step="1"></div>
+      <div class="fld"><label data-i18n="setMode"></label>
+        <select id="setMode">
+          <option value="outside" data-i18n="modeOut"></option>
+          <option value="inside" data-i18n="modeIn"></option>
+        </select>
+      </div>
+      <div class="fld"><label class="chk"><input type="checkbox" id="setCoords"> <span data-i18n="setCoords"></span></label></div>
+      <div class="hint" data-i18n="setHint"></div>
+    </div>
+
+    <div id="help" class="pop"></div>
+
+    <div id="toast"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- Константы ---------- */
+const N = 102;                          // размер грязи
+const CAP = 21;                         // размер капитолия
+const C0 = Math.floor((N - CAP) / 2);   // начало капитолия (40 => клетки 41–61)
+const BS = 3;                           // размер базы
+const OUT_M = 40;                       // сколько клеток рисовать за грязью
+const FONT = 'Segoe UI, Roboto, Arial, sans-serif';
+const KEY = 'zrr-capitol-planner-v1';
+const PALETTE = ['#ef4444','#f97316','#f59e0b','#eab308','#22c55e','#14b8a6','#3b82f6','#8b5cf6','#ec4899','#ffffff'];
+const NOTE_PALETTE = ['#fde68a','#fecaca','#bbf7d0','#bfdbfe','#ddd6fe','#e5e7eb'];
+
+const DEFS = `
+<pattern id="hatchBand" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+  <rect width="1.5" height="1.5" fill="rgba(245,158,11,.07)"/>
+  <line x1="0" y1="0" x2="0" y2="1.5" stroke="rgba(245,158,11,.25)" stroke-width=".35"/>
+</pattern>
+<pattern id="hatchCap" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)">
+  <rect width="1.2" height="1.2" fill="rgba(251,191,36,.08)"/>
+  <line x1="0" y1="0" x2="0" y2="1.2" stroke="rgba(251,191,36,.17)" stroke-width=".25"/>
+</pattern>`;
+
+
+/* ---------- Языки ---------- */
+const I18N = {
+  ru:{
+    docTitle:'Оборона Капитолия — Z Route Redemption', h1:'оборона Капитолия',
+    undo:'Отменить', undoT:'Отменить (Ctrl+Z)', redo:'Повторить', redoT:'Повторить (Ctrl+Shift+Z)',
+    fit:'Вписать', fitT:'Вписать поле (F)', pngT:'Сохранить картинкой', field:'Поле', fieldT:'Настройки поля',
+    langT:'Язык: русский / английский', helpT:'Управление', clear:'Очистить', clearT:'Удалить все объекты',
+    tSelect:'Выбор', tSelectT:'Выбор и перемещение (V)', tAlly:'Своя база', tAllyT:'Своя база 3×3 (1)',
+    tEnemy:'Враг', tEnemyT:'Вражеская база 3×3 (2)', tArrow:'Стрелка', tArrowT:'Стрелка направления (A)',
+    tArea:'Область', tAreaT:'Область с фоном (R)', tText:'Текст', tTextT:'Текст (T)', tComment:'Коммент', tCommentT:'Комментарий (C)',
+    cell:'Клетка', allies:'Своих', enemies:'Врагов', zoom:'Масштаб',
+    inCap:'капитолий', noShield:'без щитов', outside:'за грязью',
+    badBases:'⚠ баз в недопустимом месте: {0}', allyNoShield:'своих баз без щита: {0}',
+    setTitle:'Настройки поля', setBw:'Ширина зоны без щитов, клеток', setMode:'Где проходит зона',
+    modeOut:'Снаружи поля 102×102', modeIn:'Внутри поля 102×102 (по краю)', setCoords:'Показывать координаты',
+    setHint:'Капитолий 21×21 стоит в центре (клетки 41–61). Ставить на него базы нельзя. Базы можно ставить и за грязью.',
+    helpTitle:'Управление', helpNote:'План сохраняется в этом браузере автоматически.',
+    help:[['Колесо','Масштаб'],['Пробел + мышь','Двигать карту (или правая / средняя кнопка)'],['V 1 2 A R T C','Инструменты'],
+      ['Shift + клик','Добавить к выделению'],['Протянуть по пустому','Выделить рамкой'],['Двойной клик','Редактировать подпись / текст'],
+      ['Стрелки','Сдвиг на 1 клетку (Shift — на 5)'],['Ctrl+D','Дублировать'],['Delete','Удалить выделенное'],
+      ['Ctrl+Z / Ctrl+Shift+Z','Отмена / повтор'],['Alt при перетаскивании','Без привязки к сетке (кроме баз)'],['Esc','Снять выделение, инструмент «Выбор»']],
+    zoneLbl:'ЗОНА БЕЗ ЩИТОВ · {0} кл.', capitol:'КАПИТОЛИЙ', capSub:'21×21 · базы ставить нельзя', mud:'ГРЯЗЬ', beyond:'ЗА ГРЯЗЬЮ',
+    allyLetter:'С', enemyLetter:'В', allyBase:'Своя база', enemyBase:'Вражеская база', inNoShieldT:'в зоне без щитов',
+    pCap:'Нельзя ставить базу на капитолий', pBusy:'Место занято другой базой',
+    type_area:'Область', type_arrow:'Стрелка', type_text:'Текст', type_comment:'Комментарий',
+    selected:'Выбрано объектов: {0}', dup:'Дублировать', del:'Удалить', label:'Подпись', side:'Сторона', sAlly:'Своя', sEnemy:'Вражеская',
+    phBase:'Ник игрока, роль…', phArea:'Например: зона сбора', phArrow:'Например: атака 20:00',
+    color:'Цвет', opacity:'Прозрачность фона', width:'Ширина', height:'Высота', thick:'Толщина', dashed:'Пунктир',
+    textLbl:'Текст', commentLbl:'Комментарий', noteColor:'Цвет листка', size:'Размер', fontSize:'Размер шрифта',
+    front:'На передний', frontT:'Поверх объектов того же типа', back:'На задний', cells:'кл.',
+    defText:'Текст', defComment:'Комментарий',
+    tMoveBad:'Базу нельзя поставить сюда — возвращена на место', tNoSpot:'Нет свободного места для копии базы',
+    tNudgeBad:'Базу нельзя сдвинуть туда', tPngFail:'Не удалось создать PNG', tPngOk:'PNG сохранён',
+    confirmClear:'Удалить все базы, стрелки, тексты и области? Отменить можно через Ctrl+Z.', file:'oborona-kapitoliya'
+  },
+  en:{
+    docTitle:'Capitol defense — Z Route Redemption', h1:'Capitol defense',
+    undo:'Undo', undoT:'Undo (Ctrl+Z)', redo:'Redo', redoT:'Redo (Ctrl+Shift+Z)',
+    fit:'Fit', fitT:'Fit field to screen (F)', pngT:'Save as image', field:'Field', fieldT:'Field settings',
+    langT:'Language: Russian / English', helpT:'Controls', clear:'Clear', clearT:'Delete all objects',
+    tSelect:'Select', tSelectT:'Select and move (V)', tAlly:'Ally base', tAllyT:'Ally base 3×3 (1)',
+    tEnemy:'Enemy', tEnemyT:'Enemy base 3×3 (2)', tArrow:'Arrow', tArrowT:'Direction arrow (A)',
+    tArea:'Area', tAreaT:'Filled area (R)', tText:'Text', tTextT:'Text (T)', tComment:'Note', tCommentT:'Comment (C)',
+    cell:'Cell', allies:'Allies', enemies:'Enemies', zoom:'Zoom',
+    inCap:'capitol', noShield:'no shields', outside:'outside the mud',
+    badBases:'⚠ bases in invalid spots: {0}', allyNoShield:'ally bases without shield: {0}',
+    setTitle:'Field settings', setBw:'No-shield zone width, cells', setMode:'Where the zone is',
+    modeOut:'Outside the 102×102 field', modeIn:'Inside the 102×102 field (along the edge)', setCoords:'Show coordinates',
+    setHint:'The 21×21 Capitol is in the center (cells 41–61). Bases cannot be placed on it. Bases can also be placed outside the mud.',
+    helpTitle:'Controls', helpNote:'The plan is saved automatically in this browser.',
+    help:[['Wheel','Zoom'],['Space + drag','Pan the map (or right / middle button)'],['V 1 2 A R T C','Tools'],
+      ['Shift + click','Add to selection'],['Drag on empty space','Box select'],['Double-click','Edit label / text'],
+      ['Arrow keys','Move 1 cell (Shift — 5)'],['Ctrl+D','Duplicate'],['Delete','Delete selected'],
+      ['Ctrl+Z / Ctrl+Shift+Z','Undo / redo'],['Alt while dragging','No grid snapping (except bases)'],['Esc','Deselect, Select tool']],
+    zoneLbl:'NO-SHIELD ZONE · {0} cells', capitol:'CAPITOL', capSub:'21×21 · no bases allowed', mud:'MUD', beyond:'OUTSIDE THE MUD',
+    allyLetter:'A', enemyLetter:'E', allyBase:'Ally base', enemyBase:'Enemy base', inNoShieldT:'in the no-shield zone',
+    pCap:'Bases cannot be placed on the Capitol', pBusy:'Spot is taken by another base',
+    type_area:'Area', type_arrow:'Arrow', type_text:'Text', type_comment:'Comment',
+    selected:'Selected objects: {0}', dup:'Duplicate', del:'Delete', label:'Label', side:'Side', sAlly:'Ally', sEnemy:'Enemy',
+    phBase:'Player name, role…', phArea:'e.g. rally point', phArrow:'e.g. attack at 20:00',
+    color:'Color', opacity:'Fill opacity', width:'Width', height:'Height', thick:'Thickness', dashed:'Dashed',
+    textLbl:'Text', commentLbl:'Comment', noteColor:'Note color', size:'Size', fontSize:'Font size',
+    front:'Bring forward', frontT:'Above objects of the same type', back:'Send back', cells:'cells',
+    defText:'Text', defComment:'Comment',
+    tMoveBad:'A base cannot go there — moved back', tNoSpot:'No free spot for the base copy',
+    tNudgeBad:'A base cannot be moved there', tPngFail:'Could not create PNG', tPngOk:'PNG saved',
+    confirmClear:'Delete all bases, arrows, texts and areas? You can undo with Ctrl+Z.', file:'capitol-defense'
+  }
+};
+const LANG_KEY = 'zrr-capitol-planner-lang';
+let lang = (() => { try{ const v = localStorage.getItem(LANG_KEY); if(v === 'ru' || v === 'en') return v; }catch(e){} return /^ru|^uk|^be|^kk/i.test(navigator.language || '') ? 'ru' : 'en'; })();
+function t(key, ...a){ let v = (I18N[lang] && I18N[lang][key]) ?? I18N.ru[key] ?? key; a.forEach((x,i) => { v = String(v).replace('{'+i+'}', x); }); return v; }
+function applyStatic(){
+  document.documentElement.lang = lang;
+  document.title = t('docTitle');
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n-title]').forEach(el => el.title = t(el.dataset.i18nTitle));
+  $('#langLbl').textContent = lang === 'ru' ? 'RU' : 'EN';
+  $('#help').innerHTML = `<div class="ph"><b>${t('helpTitle')}</b></div><table>${t('help').map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table><div class="hint" style="margin:10px 0 0">${t('helpNote')}</div>`;
+  $('#sCoord').textContent = t('cell') + ': —';
+}
+function setLang(l){
+  lang = l; try{ localStorage.setItem(LANG_KEY, l); }catch(e){}
+  applyStatic(); propsKey = null; renderAll(); renderProps(true);
+}
+
+/* ---------- DOM ---------- */
+const $ = s => document.querySelector(s);
+const svg = $('#board'), worldL = $('#world'), objL = $('#objects'), ovL = $('#overlay');
+const props = $('#props'), stage = $('#stage');
+$('#defs').innerHTML = DEFS;
+
+/* ---------- Состояние ---------- */
+const defaultState = () => ({ settings:{ borderWidth:5, borderMode:'outside', showCoords:true }, objects:[] });
+let state = load() || defaultState();
+let selected = new Set();
+let tool = 'select';
+let view = { cx:N/2, cy:N/2, scale:6 };
+let vb = { x:0, y:0, w:100, h:100 };
+let history = [], future = [];
+let drag = null, hover = null, spaceDown = false, pendingSnap = null, saveT = null;
+let lastColor = { area:'#3b82f6', arrow:'#f59e0b', text:'#ffffff', bg:'#fde68a' };
+
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if(!d || !Array.isArray(d.objects) || !d.settings) return null;
+    d.settings = Object.assign(defaultState().settings, d.settings);
+    return d;
+  }catch(e){ return null; }
+}
+function save(){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => { try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }, 250);
+}
+const snapshot = () => JSON.stringify(state);
+function pushHistory(snap){ history.push(snap ?? snapshot()); if(history.length > 200) history.shift(); future = []; updateUndo(); }
+function commitPending(){
+  if(pendingSnap != null && pendingSnap !== snapshot()) pushHistory(pendingSnap);
+  pendingSnap = null;
+}
+function mutate(fn){ commitPending(); pushHistory(); fn(); pruneSelection(); save(); renderAll(); }
+function undo(){
+  commitPending();
+  if(!history.length) return;
+  future.push(snapshot()); state = JSON.parse(history.pop());
+  pruneSelection(); save(); renderAll(); updateUndo();
+}
+function redo(){
+  commitPending();
+  if(!future.length) return;
+  history.push(snapshot()); state = JSON.parse(future.pop());
+  pruneSelection(); save(); renderAll(); updateUndo();
+}
+function updateUndo(){ $('#bUndo').disabled = !history.length; $('#bRedo').disabled = !future.length; }
+function pruneSelection(){ for(const id of [...selected]) if(!get(id)) selected.delete(id); }
+
+const uid = () => 'o' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+const get = id => state.objects.find(o => o.id === id);
+const r2 = n => Math.round(n * 100) / 100;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+/* ---------- Геометрия поля ---------- */
+function bandOut(){ const s = state.settings; return s.borderMode === 'outside' ? (s.borderWidth|0) : 0; }
+function placeBounds(){ const o = bandOut(); return { x0:-o, y0:-o, x1:N+o, y1:N+o }; }
+const overlap = (a,b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+function inNoShield(x,y,w,h){
+  const s = state.settings, bw = s.borderWidth|0;
+  if(!bw) return false;
+  const out = s.borderMode === 'outside';
+  const a = out ? -bw : 0, b = out ? N + bw : N, i0 = out ? 0 : bw, i1 = out ? N : N - bw;
+  const touchesOuter = x < b && y < b && x + w > a && y + h > a;
+  const insideInner = x >= i0 && y >= i0 && x + w <= i1 && y + h <= i1;
+  return touchesOuter && !insideInner;
+}
+function baseProblem(x,y,ignore){
+  const r = {x,y,w:BS,h:BS};
+  if(overlap(r, {x:C0,y:C0,w:CAP,h:CAP})) return t('pCap');
+  for(const o of state.objects){
+    if(o.type !== 'base' || (ignore && ignore.has(o.id))) continue;
+    if(overlap(r, {x:o.x,y:o.y,w:BS,h:BS})) return t('pBusy');
+  }
+  return null;
+}
+function findFreeSpot(x,y){
+  for(let r = 0; r < 60; r++)
+    for(let i = -r; i <= r; i++)
+      for(let j = -r; j <= r; j++){
+        if(Math.max(Math.abs(i),Math.abs(j)) !== r) continue;
+        if(!baseProblem(x+i, y+j)) return {x:x+i, y:y+j};
+      }
+  return null;
+}
+
+/* ---------- Измерение текста ---------- */
+const mctx = document.createElement('canvas').getContext('2d');
+function tw(t,size,weight){ mctx.font = `${weight} 100px ${FONT}`; return mctx.measureText(t).width / 100 * size; }
+function textBox(o, weight){
+  let ls = String(o.text ?? '').split('\n');
+  if(!ls.some(l => l.trim())) ls = ['…'];
+  const size = o.size, lh = size * 1.25;
+  return { ls, lh, w: Math.max(...ls.map(l => tw(l, size, weight))) || size, h: ls.length * lh };
+}
+function bounds(o){
+  switch(o.type){
+    case 'base': return {x:o.x, y:o.y, w:BS, h:BS};
+    case 'area': return {x:o.x, y:o.y, w:o.w, h:o.h};
+    case 'arrow': return {x:Math.min(o.x1,o.x2), y:Math.min(o.y1,o.y2), w:Math.abs(o.x2-o.x1)||.1, h:Math.abs(o.y2-o.y1)||.1};
+    case 'text': { const t = textBox(o,700); return {x:o.x, y:o.y, w:t.w, h:t.h}; }
+    case 'comment': { const t = textBox(o,600); return {x:o.x, y:o.y, w:t.w+1.2, h:t.h+1.2}; }
+  }
+}
+
+/* ---------- Отрисовка поля ---------- */
+function worldSVG(){
+  const s = state.settings, bw = s.borderWidth|0, out = s.borderMode === 'outside';
+  const a = out ? -bw : 0, b = out ? N + bw : N, sz = b - a;
+  const M = OUT_M, oa = a - M, ob = b + M;
+  let h = `<rect x="${oa}" y="${oa}" width="${ob-oa}" height="${ob-oa}" fill="#1c2620"/>`;
+  let on = '';
+  for(let i = oa; i <= ob; i++) on += `M${i} ${oa}V${ob}M${oa} ${i}H${ob}`;
+  h += `<path d="${on}" stroke="rgba(255,255,255,.035)" stroke-width="1" vector-effect="non-scaling-stroke" fill="none"/>`;
+  h += `<text x="${N/2}" y="${ob-2}" font-size="2" font-family="${FONT}" font-weight="700" fill="rgba(255,255,255,.25)" text-anchor="middle" letter-spacing=".2">${t('beyond')}</text>`;
+  h += `<rect x="${a}" y="${a}" width="${sz}" height="${sz}" fill="#2a2620"/>`;
+
+  if(bw > 0){
+    const i0 = out ? 0 : bw, i1 = out ? N : N - bw;
+    h += `<path d="M${a} ${a}H${b}V${b}H${a}Z M${i0} ${i0}V${i1}H${i1}V${i0}Z" fill="url(#hatchBand)" fill-rule="evenodd"/>`;
+    h += `<rect x="${i0}" y="${i0}" width="${i1-i0}" height="${i1-i0}" fill="none" stroke="#f59e0b" stroke-opacity=".6" stroke-width=".15" stroke-dasharray=".8 .5"/>`;
+    if(bw >= 2){
+      const fs = Math.min(bw * .5, 1.6);
+      h += `<text x="${N/2}" y="${a + bw/2}" font-size="${fs}" font-family="${FONT}" font-weight="700" fill="#f59e0b" fill-opacity=".85" text-anchor="middle" dominant-baseline="central" letter-spacing=".1">${t('zoneLbl', bw)}</text>`;
+    }
+  }
+
+  let mn = '', mj = '';
+  for(let i = a; i <= b; i++){
+    const seg = `M${i} ${a}V${b}M${a} ${i}H${b}`;
+    if(i % 10 === 0) mj += seg; else mn += seg;
+  }
+  h += `<path d="${mn}" stroke="rgba(255,255,255,.055)" stroke-width="1" vector-effect="non-scaling-stroke" fill="none"/>`;
+  h += `<path d="${mj}" stroke="rgba(255,255,255,.12)" stroke-width="1" vector-effect="non-scaling-stroke" fill="none"/>`;
+  h += `<rect x="0" y="0" width="${N}" height="${N}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width=".15"/>`;
+  if(out && bw) h += `<rect x="${a}" y="${a}" width="${sz}" height="${sz}" fill="none" stroke="rgba(245,158,11,.5)" stroke-width=".15"/>`;
+
+  // Капитолий
+  h += `<rect x="${C0}" y="${C0}" width="${CAP}" height="${CAP}" fill="url(#hatchCap)" stroke="#fbbf24" stroke-width=".25"/>`;
+  h += `<text x="${C0+CAP/2}" y="${C0+CAP/2-.6}" font-size="2.4" font-family="${FONT}" font-weight="800" fill="#fbbf24" text-anchor="middle" letter-spacing=".15">${t('capitol')}</text>`;
+  h += `<text x="${C0+CAP/2}" y="${C0+CAP/2+1.6}" font-size="1.1" font-family="${FONT}" fill="#fbbf24" fill-opacity=".75" text-anchor="middle">${t('capSub')}</text>`;
+
+  // Заголовок и координаты
+  h += `<text x="${N/2}" y="${a-3.2}" font-size="3" font-family="${FONT}" font-weight="800" fill="#e7d9c3" text-anchor="middle" letter-spacing=".2">${t('mud')} <tspan font-size="1.6" fill-opacity=".55" font-weight="600">102×102</tspan></text>`;
+  if(s.showCoords){
+    for(const m of [1,10,20,30,40,50,60,70,80,90,100,102]){
+      h += `<text x="${m-.5}" y="${a-.7}" font-size=".9" font-family="${FONT}" fill="rgba(255,255,255,.45)" text-anchor="middle">${m}</text>`;
+      h += `<text x="${a-.6}" y="${m-.5}" font-size=".9" font-family="${FONT}" fill="rgba(255,255,255,.45)" text-anchor="end" dominant-baseline="central">${m}</text>`;
+    }
+  }
+  return h;
+}
+
+/* ---------- Отрисовка объектов ---------- */
+const halo = (w) => `stroke="rgba(0,0,0,.8)" stroke-width="${w}" stroke-linejoin="round" paint-order="stroke"`;
+function tspans(ls,x,y0,lh){
+  return ls.map((l,i) => `<tspan x="${r2(x)}" y="${r2(y0 + i*lh)}">${esc(l) || '\u00a0'}</tspan>`).join('');
+}
+const R = {
+  base(o, inter){
+    const ally = o.side === 'ally';
+    const f = ally ? '#1e40af' : '#991b1b', s = ally ? '#60a5fa' : '#f87171';
+    const prob = baseProblem(o.x, o.y, new Set([o.id]));
+    const ns = inNoShield(o.x, o.y, BS, BS);
+    let g = `<g${inter ? ` data-id="${o.id}"` : ''}>`;
+    g += `<title>${ally ? t('allyBase') : t('enemyBase')}${o.label ? ': ' + esc(o.label) : ''}${ns ? ' — ' + t('inNoShieldT') : ''}${prob ? ' — ' + prob : ''}</title>`;
+    g += `<rect x="${o.x+.12}" y="${o.y+.12}" width="2.76" height="2.76" rx=".35" fill="${f}" stroke="${s}" stroke-width=".2"/>`;
+    g += `<text x="${o.x+1.5}" y="${o.y+1.55}" font-size="1.45" font-weight="800" font-family="${FONT}" text-anchor="middle" dominant-baseline="central" fill="#fff">${ally ? t('allyLetter') : t('enemyLetter')}</text>`;
+    if(ns) g += `<circle cx="${o.x+2.85}" cy="${o.y+.15}" r=".62" fill="#f59e0b" stroke="#111" stroke-width=".1"/><text x="${o.x+2.85}" y="${o.y+.18}" font-size=".95" font-weight="900" font-family="${FONT}" text-anchor="middle" dominant-baseline="central" fill="#111">!</text>`;
+    if(prob) g += `<rect x="${o.x-.25}" y="${o.y-.25}" width="3.5" height="3.5" fill="none" stroke="#ff3b3b" stroke-width=".22" stroke-dasharray=".5 .3"/>`;
+    if(o.label) g += `<text x="${o.x+1.5}" y="${o.y-.4}" font-size="1" font-weight="600" font-family="${FONT}" text-anchor="middle" fill="#fff" ${halo(.28)}>${esc(o.label)}</text>`;
+    return g + '</g>';
+  },
+  area(o, inter){
+    let g = `<g${inter ? ` data-id="${o.id}"` : ''}>`;
+    g += `<rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${o.color}" fill-opacity="${o.opacity}" stroke="${o.color}" stroke-width=".18" stroke-dasharray=".7 .4"/>`;
+    if(o.label) g += `<text x="${o.x+.5}" y="${o.y+1.6}" font-size="1.3" font-weight="700" font-family="${FONT}" fill="${o.color}" ${halo(.3)}>${esc(o.label)}</text>`;
+    return g + '</g>';
+  },
+  arrow(o, inter){
+    const dx = o.x2 - o.x1, dy = o.y2 - o.y1, L = Math.hypot(dx,dy);
+    if(L < .01) return '';
+    const ux = dx/L, uy = dy/L, w = o.width, hl = Math.min(Math.max(1.3, w*3), L), hw = hl * .6;
+    const bx = o.x2 - ux*hl, by = o.y2 - uy*hl, px = -uy, py = ux;
+    let g = `<g${inter ? ` data-id="${o.id}"` : ''}>`;
+    if(inter) g += `<line x1="${o.x1}" y1="${o.y1}" x2="${o.x2}" y2="${o.y2}" stroke="transparent" stroke-width="${Math.max(1.6, w+1)}" stroke-linecap="round"/>`;
+    g += `<line x1="${o.x1}" y1="${o.y1}" x2="${r2(bx)}" y2="${r2(by)}" stroke="${o.color}" stroke-width="${w}" stroke-linecap="${o.dashed ? 'butt' : 'round'}"${o.dashed ? ` stroke-dasharray="${r2(w*2)} ${r2(w*1.4)}"` : ''}/>`;
+    g += `<polygon points="${o.x2},${o.y2} ${r2(bx+px*hw)},${r2(by+py*hw)} ${r2(bx-px*hw)},${r2(by-py*hw)}" fill="${o.color}"/>`;
+    if(o.label){
+      const mx = (o.x1+o.x2)/2 + px*1.3, my = (o.y1+o.y2)/2 + py*1.3;
+      g += `<text x="${r2(mx)}" y="${r2(my)}" font-size="1.1" font-weight="700" font-family="${FONT}" text-anchor="middle" dominant-baseline="central" fill="${o.color}" ${halo(.3)}>${esc(o.label)}</text>`;
+    }
+    return g + '</g>';
+  },
+  text(o, inter){
+    const t = textBox(o,700);
+    let g = `<g${inter ? ` data-id="${o.id}"` : ''}>`;
+    if(inter) g += `<rect x="${o.x}" y="${o.y}" width="${r2(t.w)}" height="${r2(t.h)}" fill="transparent"/>`;
+    g += `<text font-size="${o.size}" font-weight="700" font-family="${FONT}" fill="${o.color}" ${halo(r2(o.size*.16))}>${tspans(t.ls, o.x, o.y + o.size*.92, t.lh)}</text>`;
+    return g + '</g>';
+  },
+  comment(o, inter){
+    const t = textBox(o,600), pad = .6, W = t.w + pad*2, H = t.h + pad*2;
+    let g = `<g${inter ? ` data-id="${o.id}"` : ''}>`;
+    g += `<polygon points="${o.x+.7},${r2(o.y+H-.05)} ${o.x+2.1},${r2(o.y+H-.05)} ${o.x+.7},${r2(o.y+H+1)}" fill="${o.bg}"/>`;
+    g += `<rect x="${o.x}" y="${o.y}" width="${r2(W)}" height="${r2(H)}" rx=".3" fill="${o.bg}" stroke="rgba(0,0,0,.35)" stroke-width=".08"/>`;
+    g += `<text font-size="${o.size}" font-weight="600" font-family="${FONT}" fill="#1f2937">${tspans(t.ls, o.x+pad, o.y + pad + o.size*.92, t.lh)}</text>`;
+    return g + '</g>';
+  }
+};
+const ORDER = {area:0, base:1, arrow:2, text:3, comment:4};
+function objectsSVG(inter){
+  return state.objects.map((o,i) => [o,i])
+    .sort((a,b) => ORDER[a[0].type] - ORDER[b[0].type] || a[1] - b[1])
+    .map(([o]) => R[o.type](o, inter)).join('');
+}
+
+/* ---------- Оверлей: выделение, ручки, призраки ---------- */
+function ghostPos(p){ return { x: Math.round(p.x - 1.5), y: Math.round(p.y - 1.5) }; }
+function areaDraft(a,b){
+  const x0 = Math.floor(Math.min(a.x,b.x)), y0 = Math.floor(Math.min(a.y,b.y));
+  const x1 = Math.floor(Math.max(a.x,b.x)) + 1, y1 = Math.floor(Math.max(a.y,b.y)) + 1;
+  return {x:x0, y:y0, w:x1-x0, h:y1-y0};
+}
+function normRect(a,b){ return {x:Math.min(a.x,b.x), y:Math.min(a.y,b.y), w:Math.abs(b.x-a.x), h:Math.abs(b.y-a.y)}; }
+
+function renderOverlay(){
+  const k = 1 / view.scale; let h = '';
+  for(const id of selected){
+    const o = get(id); if(!o) continue;
+    const b = bounds(o), pad = .3;
+    h += `<rect x="${b.x-pad}" y="${b.y-pad}" width="${b.w+pad*2}" height="${b.h+pad*2}" fill="none" stroke="#f59e0b" stroke-width="${1.6*k}" stroke-dasharray="${5*k} ${3*k}"/>`;
+  }
+  if(selected.size === 1 && !(drag && drag.type === 'move')){
+    const o = get([...selected][0]), hs = 5*k;
+    const handle = (name,x,y,round) => round
+      ? `<circle data-handle="${name}" pointer-events="all" cx="${x}" cy="${y}" r="${hs*1.15}" fill="#fff" stroke="#f59e0b" stroke-width="${2*k}"/>`
+      : `<rect data-handle="${name}" pointer-events="all" x="${x-hs}" y="${y-hs}" width="${hs*2}" height="${hs*2}" fill="#fff" stroke="#f59e0b" stroke-width="${2*k}"/>`;
+    if(o && o.type === 'area'){
+      h += handle('nw',o.x,o.y) + handle('ne',o.x+o.w,o.y) + handle('sw',o.x,o.y+o.h) + handle('se',o.x+o.w,o.y+o.h);
+    } else if(o && o.type === 'arrow'){
+      h += handle('p1',o.x1,o.y1,true) + handle('p2',o.x2,o.y2,true);
+    }
+  }
+  if(hover && !drag && (tool === 'ally' || tool === 'enemy')){
+    const g = ghostPos(hover), bad = baseProblem(g.x, g.y), c = bad ? '#ef4444' : '#22c55e';
+    h += `<rect x="${g.x}" y="${g.y}" width="3" height="3" rx=".3" fill="${c}" fill-opacity=".3" stroke="${c}" stroke-width="${2*k}"/>`;
+  }
+  if(drag){
+    if(drag.type === 'marquee'){
+      const r = normRect(drag.a, drag.b);
+      h += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="rgba(245,158,11,.08)" stroke="#f59e0b" stroke-width="${1.2*k}"/>`;
+    } else if(drag.type === 'arrow'){
+      h += R.arrow({x1:drag.a.x,y1:drag.a.y,x2:drag.b.x,y2:drag.b.y,color:lastColor.arrow,width:.5}, false);
+    } else if(drag.type === 'area'){
+      const r = areaDraft(drag.a, drag.b);
+      h += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${lastColor.area}" fill-opacity=".25" stroke="${lastColor.area}" stroke-width="${1.5*k}"/>`;
+      h += `<text x="${r.x+r.w+.4}" y="${r.y+r.h+1.2}" font-size="${12*k}" font-family="${FONT}" fill="#fff" ${halo(3*k)}>${r.w}×${r.h}</text>`;
+    }
+  }
+  ovL.innerHTML = h;
+}
+
+/* ---------- Панель свойств ---------- */
+let propsKey = null;
+function swatches(field, list, current, withPicker){
+  return `<div class="sw">${list.map(c => `<button data-act="color" data-key="${field}" data-v="${c}" class="${c.toLowerCase() === String(current).toLowerCase() ? 'on' : ''}" style="background:${c}" title="${c}"></button>`).join('')}${withPicker ? `<input type="color" data-field="${field}" value="${current}">` : ''}</div>`;
+}
+function renderProps(force){
+  const ids = [...selected], key = ids.join(',');
+  if(!force && key === propsKey && props.contains(document.activeElement)){ updateInfo(); return; }
+  propsKey = key;
+  if(!ids.length){ props.style.display = 'none'; props.innerHTML = ''; return; }
+  props.style.display = 'block';
+  const actions = `<div class="row">
+      <button class="btn" data-act="dup" title="Ctrl+D">${t('dup')}</button>
+      <button class="btn danger" data-act="del" title="Delete">${t('del')}</button></div>`;
+  if(ids.length > 1){
+    props.innerHTML = `<div class="ph"><b>${t('selected', ids.length)}</b></div>${actions}`;
+    return;
+  }
+  const o = get(ids[0]); if(!o) return;
+  let h = `<div class="ph"><b>${o.type === 'base' ? (o.side === 'ally' ? t('allyBase') : t('enemyBase')) : t('type_' + o.type)}</b><span id="pinfo"></span></div>`;
+  const lbl = (ph) => `<div class="fld"><label>${t('label')}</label><input type="text" data-field="label" value="${esc(o.label || '')}" placeholder="${ph}"></div>`;
+  switch(o.type){
+    case 'base':
+      h += `<div class="fld"><label>${t('side')}</label><div class="seg">
+        <button class="btn ${o.side === 'ally' ? 'on-ally' : ''}" data-act="side" data-v="ally">${t('sAlly')}</button>
+        <button class="btn ${o.side === 'enemy' ? 'on-enemy' : ''}" data-act="side" data-v="enemy">${t('sEnemy')}</button></div></div>`;
+      h += lbl(t('phBase'));
+      break;
+    case 'area':
+      h += lbl(t('phArea'));
+      h += `<div class="fld"><label>${t('color')}</label>${swatches('color', PALETTE, o.color, true)}</div>`;
+      h += `<div class="fld"><label>${t('opacity')} <span id="vOp">${Math.round(o.opacity*100)}%</span></label><input type="range" data-field="opacity" min=".05" max=".85" step=".05" value="${o.opacity}"></div>`;
+      h += `<div class="fld two"><div style="flex:1"><label style="color:var(--muted);font-size:12px">${t('width')}</label><input type="number" data-field="w" min="1" max="150" value="${o.w}"></div><div style="flex:1"><label style="color:var(--muted);font-size:12px">${t('height')}</label><input type="number" data-field="h" min="1" max="150" value="${o.h}"></div></div>`;
+      break;
+    case 'arrow':
+      h += lbl(t('phArrow'));
+      h += `<div class="fld"><label>${t('color')}</label>${swatches('color', PALETTE, o.color, true)}</div>`;
+      h += `<div class="fld"><label>${t('thick')} <span id="vW">${o.width}</span></label><input type="range" data-field="width" min=".2" max="2" step=".1" value="${o.width}"></div>`;
+      h += `<div class="fld"><label class="chk"><input type="checkbox" data-field="dashed" ${o.dashed ? 'checked' : ''}> ${t('dashed')}</label></div>`;
+      break;
+    case 'text':
+      h += `<div class="fld"><label>${t('textLbl')}</label><textarea data-field="text">${esc(o.text)}</textarea></div>`;
+      h += `<div class="fld"><label>${t('color')}</label>${swatches('color', PALETTE, o.color, true)}</div>`;
+      h += `<div class="fld"><label>${t('size')} <span id="vS">${o.size}</span></label><input type="range" data-field="size" min=".8" max="6" step=".2" value="${o.size}"></div>`;
+      break;
+    case 'comment':
+      h += `<div class="fld"><label>${t('commentLbl')}</label><textarea data-field="text">${esc(o.text)}</textarea></div>`;
+      h += `<div class="fld"><label>${t('noteColor')}</label>${swatches('bg', NOTE_PALETTE, o.bg, false)}</div>`;
+      h += `<div class="fld"><label>${t('fontSize')} <span id="vS">${o.size}</span></label><input type="range" data-field="size" min=".7" max="3" step=".1" value="${o.size}"></div>`;
+      break;
+  }
+  h += `<div class="row" style="margin-bottom:6px"><button class="btn" data-act="front" title="${t('frontT')}">${t('front')}</button><button class="btn" data-act="back">${t('back')}</button></div>`;
+  h += actions;
+  props.innerHTML = h;
+  updateInfo();
+}
+function updateInfo(){
+  const el = $('#pinfo'); if(!el || selected.size !== 1) return;
+  const o = get([...selected][0]); if(!o) return;
+  if(o.type === 'base') el.textContent = `X ${o.x+1}–${o.x+3} · Y ${o.y+1}–${o.y+3}`;
+  else if(o.type === 'area') el.textContent = `${o.w}×${o.h} ${t('cells')}`;
+  else el.textContent = '';
+}
+props.addEventListener('input', e => {
+  const f = e.target.dataset.field; if(!f || selected.size !== 1) return;
+  const o = get([...selected][0]); if(!o) return;
+  if(pendingSnap == null) pendingSnap = snapshot();
+  let v;
+  if(e.target.type === 'checkbox') v = e.target.checked;
+  else if(e.target.type === 'range' || e.target.type === 'number'){
+    v = parseFloat(e.target.value); if(isNaN(v)) return;
+    if(f === 'w' || f === 'h') v = Math.max(1, Math.min(150, Math.round(v)));
+  } else v = e.target.value;
+  o[f] = v;
+  if(f === 'color') lastColor[o.type] = v;
+  if(f === 'opacity') $('#vOp').textContent = Math.round(v*100) + '%';
+  if(f === 'width') $('#vW').textContent = v;
+  if(f === 'size') $('#vS').textContent = v;
+  save(); renderObjects(); renderOverlay(); updateInfo();
+});
+props.addEventListener('focusout', e => { if(!props.contains(e.relatedTarget)) commitPending(); });
+props.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if(!b) return;
+  const act = b.dataset.act, o = selected.size === 1 ? get([...selected][0]) : null;
+  if(act === 'del') return deleteSel();
+  if(act === 'dup') return duplicate();
+  if(!o) return;
+  if(act === 'side'){ mutate(() => { o.side = b.dataset.v; }); renderProps(true); }
+  if(act === 'color'){
+    const key = b.dataset.key;
+    mutate(() => { o[key] = b.dataset.v; });
+    lastColor[key === 'bg' ? 'bg' : o.type] = b.dataset.v;
+    renderProps(true);
+  }
+  if(act === 'front' || act === 'back') mutate(() => {
+    const i = state.objects.indexOf(o); state.objects.splice(i,1);
+    act === 'front' ? state.objects.push(o) : state.objects.unshift(o);
+  });
+});
+
+/* ---------- Статус и общий рендер ---------- */
+function renderStatus(){
+  let a = 0, en = 0, bad = 0, ns = 0;
+  for(const o of state.objects) if(o.type === 'base'){
+    o.side === 'ally' ? a++ : en++;
+    if(baseProblem(o.x, o.y, new Set([o.id]))) bad++;
+    if(o.side === 'ally' && inNoShield(o.x, o.y, BS, BS)) ns++;
+  }
+  $('#sAlly').textContent = a; $('#sEnemy').textContent = en;
+  const w = [];
+  if(bad) w.push(t('badBases', bad));
+  if(ns) w.push(t('allyNoShield', ns));
+  $('#sWarn').textContent = w.join(' · ');
+}
+function renderWorld(){ worldL.innerHTML = worldSVG(); }
+function renderObjects(){ objL.innerHTML = objectsSVG(true); }
+function renderAll(){ renderWorld(); renderObjects(); renderOverlay(); renderProps(); renderStatus(); }
+
+/* ---------- Вид: панорама и масштаб ---------- */
+function updateViewBox(){
+  const r = svg.getBoundingClientRect(); if(!r.width || !r.height) return;
+  vb = { x: view.cx - r.width/2/view.scale, y: view.cy - r.height/2/view.scale, w: r.width/view.scale, h: r.height/view.scale };
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  $('#sZoom').textContent = Math.round(view.scale / 8 * 100) + '%';
+  renderOverlay();
+}
+function fit(){
+  const r = svg.getBoundingClientRect(); if(!r.width) return;
+  const o = bandOut(), a = -o - 7, b = N + o + 1, sz = b - a;
+  view.scale = Math.max(1.5, Math.min(r.width / sz, (r.height - 120) / sz));
+  view.cx = (a + b) / 2;
+  view.cy = (a + b) / 2 + 40 / view.scale;
+  updateViewBox();
+}
+function toCell(e){
+  const r = svg.getBoundingClientRect();
+  return { x: vb.x + (e.clientX - r.left) / view.scale, y: vb.y + (e.clientY - r.top) / view.scale };
+}
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = toCell(e), r = svg.getBoundingClientRect();
+  const ns = Math.max(1.5, Math.min(60, view.scale * Math.exp(-e.deltaY * (e.ctrlKey ? .01 : .0015))));
+  view.scale = ns;
+  view.cx = p.x - (e.clientX - r.left - r.width/2) / ns;
+  view.cy = p.y - (e.clientY - r.top - r.height/2) / ns;
+  updateViewBox();
+}, {passive:false});
+new ResizeObserver(() => updateViewBox()).observe(stage);
+
+/* ---------- Мышь ---------- */
+const snapH = (p,e) => e.altKey ? {x:r2(p.x), y:r2(p.y)} : {x:Math.round(p.x*2)/2, y:Math.round(p.y*2)/2};
+
+svg.addEventListener('contextmenu', e => e.preventDefault());
+svg.addEventListener('pointerdown', e => {
+  if(document.activeElement && props.contains(document.activeElement)) document.activeElement.blur();
+  closePops();
+  const p = toCell(e);
+  try{ svg.setPointerCapture(e.pointerId); }catch(_){}
+  if(e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)){
+    drag = { type:'pan', sx:e.clientX, sy:e.clientY, cx:view.cx, cy:view.cy };
+    svg.classList.add('panning'); e.preventDefault(); return;
+  }
+  if(e.button !== 0) return;
+
+  if(tool === 'select'){
+    const hEl = e.target.closest('[data-handle]');
+    if(hEl && selected.size === 1){
+      const o = get([...selected][0]);
+      drag = { type:'handle', h:hEl.dataset.handle, id:o.id, orig:{...o}, snap:snapshot() };
+      return;
+    }
+    const oEl = e.target.closest('[data-id]');
+    if(oEl){
+      const id = oEl.dataset.id;
+      if(e.shiftKey){
+        selected.has(id) ? selected.delete(id) : selected.add(id);
+        renderOverlay(); renderProps();
+        if(!selected.has(id)) return;
+      } else if(!selected.has(id)) selected = new Set([id]);
+      const orig = new Map([...selected].map(i => [i, {...get(i)}]));
+      drag = { type:'move', start:p, orig, snap:snapshot(), moved:false, clickId: e.shiftKey ? null : id };
+      renderOverlay(); renderProps();
+      return;
+    }
+    if(!e.shiftKey) selected.clear();
+    drag = { type:'marquee', a:p, b:p };
+    renderOverlay(); renderProps();
+    return;
+  }
+  if(tool === 'ally' || tool === 'enemy'){
+    const g = ghostPos(p), prob = baseProblem(g.x, g.y);
+    if(prob){ toast(prob); return; }
+    const o = { id:uid(), type:'base', side:tool, x:g.x, y:g.y, label:'' };
+    mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+    return;
+  }
+  if(tool === 'arrow'){ const a = snapH(p,e); drag = { type:'arrow', a, b:a }; return; }
+  if(tool === 'area'){ drag = { type:'area', a:p, b:p }; return; }
+  if(tool === 'text' || tool === 'comment'){
+    e.preventDefault();
+    const o = tool === 'text'
+      ? { id:uid(), type:'text', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defText'), color:lastColor.text, size:2 }
+      : { id:uid(), type:'comment', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defComment'), bg:lastColor.bg, size:1.1 };
+    setTool('select');
+    mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+    focusEditor(true);
+  }
+});
+
+svg.addEventListener('pointermove', e => {
+  const p = toCell(e); hover = p;
+  showCoord(p);
+  if(!drag){ if(tool === 'ally' || tool === 'enemy') renderOverlay(); return; }
+  switch(drag.type){
+    case 'pan':
+      view.cx = drag.cx - (e.clientX - drag.sx) / view.scale;
+      view.cy = drag.cy - (e.clientY - drag.sy) / view.scale;
+      updateViewBox(); break;
+    case 'move': {
+      const hasBase = [...drag.orig.values()].some(o => o.type === 'base');
+      const st = hasBase ? 1 : (e.altKey ? .1 : .5);
+      const dx = r2(Math.round((p.x - drag.start.x) / st) * st), dy = r2(Math.round((p.y - drag.start.y) / st) * st);
+      if(dx || dy) drag.moved = true;
+      for(const [id,o0] of drag.orig){
+        const o = get(id); if(!o) continue;
+        if(o.type === 'arrow'){ o.x1 = r2(o0.x1+dx); o.y1 = r2(o0.y1+dy); o.x2 = r2(o0.x2+dx); o.y2 = r2(o0.y2+dy); }
+        else { o.x = r2(o0.x+dx); o.y = r2(o0.y+dy); }
+      }
+      drag.invalid = [...drag.orig.keys()].map(get).some(o => o && o.type === 'base' && baseProblem(o.x, o.y, new Set([o.id])));
+      renderObjects(); renderOverlay(); updateInfo();
+      break;
+    }
+    case 'handle': {
+      const o = get(drag.id), O = drag.orig; if(!o) break;
+      if(o.type === 'area'){
+        let l = O.x, t = O.y, rr = O.x + O.w, b = O.y + O.h;
+        const sx = Math.round(p.x), sy = Math.round(p.y);
+        if(drag.h.includes('w')) l = Math.min(sx, rr - 1);
+        if(drag.h.includes('e')) rr = Math.max(sx, l + 1);
+        if(drag.h.includes('n')) t = Math.min(sy, b - 1);
+        if(drag.h.includes('s')) b = Math.max(sy, t + 1);
+        o.x = l; o.y = t; o.w = rr - l; o.h = b - t;
+      } else if(o.type === 'arrow'){
+        const s = snapH(p,e);
+        if(drag.h === 'p1'){ o.x1 = s.x; o.y1 = s.y; } else { o.x2 = s.x; o.y2 = s.y; }
+      }
+      renderObjects(); renderOverlay(); updateInfo();
+      break;
+    }
+    case 'marquee': drag.b = p; renderOverlay(); break;
+    case 'arrow': drag.b = snapH(p,e); renderOverlay(); break;
+    case 'area': drag.b = p; renderOverlay(); break;
+  }
+});
+
+function endDrag(){
+  const d = drag; drag = null; svg.classList.remove('panning');
+  if(!d) return;
+  switch(d.type){
+    case 'move':
+      if(d.invalid){
+        for(const [id,o0] of d.orig){ const i = state.objects.findIndex(x => x.id === id); if(i >= 0) state.objects[i] = {...o0}; }
+        toast(t('tMoveBad'));
+      } else if(d.moved){ pushHistory(d.snap); save(); }
+      else if(d.clickId) selected = new Set([d.clickId]);
+      renderAll(); break;
+    case 'handle':
+      if(snapshot() !== d.snap){ pushHistory(d.snap); save(); }
+      renderAll(); break;
+    case 'marquee': {
+      const r = normRect(d.a, d.b);
+      if(r.w > .2 || r.h > .2) for(const o of state.objects) if(overlap(bounds(o), r)) selected.add(o.id);
+      renderOverlay(); renderProps(); break;
+    }
+    case 'arrow':
+      if(Math.hypot(d.b.x - d.a.x, d.b.y - d.a.y) >= 1){
+        const o = { id:uid(), type:'arrow', x1:d.a.x, y1:d.a.y, x2:d.b.x, y2:d.b.y, color:lastColor.arrow, width:.5, dashed:false, label:'' };
+        mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
+      } else renderOverlay();
+      break;
+    case 'area':
+      if(Math.abs(d.b.x - d.a.x) < .3 && Math.abs(d.b.y - d.a.y) < .3){ renderOverlay(); break; }
+      { const r = areaDraft(d.a, d.b);
+        const o = { id:uid(), type:'area', ...r, color:lastColor.area, opacity:.25, label:'' };
+        mutate(() => { state.objects.push(o); selected = new Set([o.id]); }); }
+      break;
+  }
+}
+svg.addEventListener('pointerup', endDrag);
+svg.addEventListener('pointercancel', endDrag);
+svg.addEventListener('pointerleave', () => { hover = null; if(!drag) renderOverlay(); $('#sCoord').textContent = t('cell') + ': —'; });
+svg.addEventListener('dblclick', e => {
+  const el = e.target.closest('[data-id]'); if(!el) return;
+  selected = new Set([el.dataset.id]); renderOverlay(); renderProps(true); focusEditor(true);
+});
+function focusEditor(selectAll){
+  const f = props.querySelector('textarea[data-field=text], input[data-field=label]');
+  if(f){ f.focus(); if(selectAll) f.select(); }
+}
+function showCoord(p){
+  const cx = Math.floor(p.x) + 1, cy = Math.floor(p.y) + 1;
+  let s = `${t('cell')}: ${cx}, ${cy}`;
+  if(p.x >= C0 && p.x < C0+CAP && p.y >= C0 && p.y < C0+CAP) s += ' · ' + t('inCap');
+  else if(inNoShield(Math.floor(p.x), Math.floor(p.y), 1, 1)) s += ' · ' + t('noShield');
+  else { const b = placeBounds(); if(p.x < b.x0 || p.y < b.y0 || p.x >= b.x1 || p.y >= b.y1) s += ' · ' + t('outside'); }
+  $('#sCoord').textContent = s;
+}
+
+/* ---------- Действия ---------- */
+function deleteSel(){
+  if(!selected.size) return;
+  mutate(() => { state.objects = state.objects.filter(o => !selected.has(o.id)); selected.clear(); });
+}
+function duplicate(){
+  if(!selected.size) return;
+  let skipped = 0;
+  mutate(() => {
+    const ids = [];
+    for(const id of selected){
+      const o = get(id); if(!o) continue;
+      const c = JSON.parse(JSON.stringify(o)); c.id = uid();
+      if(c.type === 'base'){ const sp = findFreeSpot(o.x + 4, o.y); if(!sp){ skipped++; continue; } c.x = sp.x; c.y = sp.y; }
+      else if(c.type === 'arrow'){ c.x1 += 2; c.y1 += 2; c.x2 += 2; c.y2 += 2; }
+      else { c.x += 2; c.y += 2; }
+      state.objects.push(c); ids.push(c.id);
+    }
+    selected = new Set(ids);
+  });
+  if(skipped) toast(t('tNoSpot'));
+}
+function nudge(dx,dy){
+  if(!selected.size) return;
+  commitPending();
+  const snap = snapshot();
+  for(const id of selected){
+    const o = get(id); if(!o) continue;
+    if(o.type === 'arrow'){ o.x1 += dx; o.x2 += dx; o.y1 += dy; o.y2 += dy; } else { o.x += dx; o.y += dy; }
+  }
+  const bad = [...selected].map(get).some(o => o && o.type === 'base' && baseProblem(o.x, o.y, new Set([o.id])));
+  if(bad){ state = JSON.parse(snap); toast(t('tNudgeBad')); }
+  else { pushHistory(snap); save(); }
+  renderAll();
+}
+function setTool(t){
+  tool = t;
+  document.querySelectorAll('.tool').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  svg.setAttribute('class', 'tool-' + t + (spaceDown ? ' space' : ''));
+  renderOverlay();
+}
+document.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+
+let toastT;
+function toast(msg, ok){
+  const t = $('#toast'); t.textContent = msg; t.className = 'show' + (ok ? ' ok' : '');
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = '', 2200);
+}
+
+/* ---------- Клавиатура ---------- */
+document.addEventListener('keydown', e => {
+  const typing = /INPUT|TEXTAREA|SELECT/.test(e.target.tagName);
+  if(typing){ if(e.key === 'Escape') e.target.blur(); return; }
+  const mod = e.ctrlKey || e.metaKey;
+  if(e.code === 'Space'){ if(!spaceDown){ spaceDown = true; svg.classList.add('space'); } e.preventDefault(); return; }
+  if(mod && e.code === 'KeyZ'){ e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if(mod && e.code === 'KeyY'){ e.preventDefault(); redo(); return; }
+  if(mod && e.code === 'KeyD'){ e.preventDefault(); duplicate(); return; }
+  if(mod && e.code === 'KeyA'){ e.preventDefault(); selected = new Set(state.objects.map(o => o.id)); renderOverlay(); renderProps(); return; }
+  if(mod) return;
+  if(e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); deleteSel(); return; }
+  if(e.key === 'Escape'){ selected.clear(); closePops(); setTool('select'); renderAll(); return; }
+  const step = e.shiftKey ? 5 : 1;
+  const arrows = { ArrowLeft:[-step,0], ArrowRight:[step,0], ArrowUp:[0,-step], ArrowDown:[0,step] };
+  if(arrows[e.key]){ e.preventDefault(); nudge(...arrows[e.key]); return; }
+  const tools = { KeyV:'select', Digit1:'ally', Digit2:'enemy', KeyA:'arrow', KeyR:'area', KeyT:'text', KeyC:'comment' };
+  if(tools[e.code]){ setTool(tools[e.code]); return; }
+  if(e.code === 'KeyF') fit();
+});
+document.addEventListener('keyup', e => { if(e.code === 'Space'){ spaceDown = false; svg.classList.remove('space'); } });
+window.addEventListener('blur', () => { spaceDown = false; svg.classList.remove('space'); });
+
+/* ---------- Шапка: кнопки и всплывающие окна ---------- */
+function closePops(except){ for(const id of ['settings','help']) if(id !== except) $('#'+id).style.display = 'none'; }
+function togglePop(id){ const el = $('#'+id), open = el.style.display === 'block'; closePops(id); el.style.display = open ? 'none' : 'block'; }
+$('#bUndo').onclick = undo;
+$('#bRedo').onclick = redo;
+$('#bFit').onclick = fit;
+$('#bHelp').onclick = () => togglePop('help');
+$('#bLang').onclick = () => setLang(lang === 'ru' ? 'en' : 'ru');
+$('#bSettings').onclick = () => {
+  const s = state.settings;
+  $('#setBw').value = s.borderWidth; $('#setMode').value = s.borderMode; $('#setCoords').checked = s.showCoords;
+  togglePop('settings');
+};
+$('#setBw').addEventListener('change', e => {
+  const v = Math.max(0, Math.min(40, Math.round(+e.target.value || 0)));
+  e.target.value = v; mutate(() => { state.settings.borderWidth = v; });
+});
+$('#setMode').addEventListener('change', e => mutate(() => { state.settings.borderMode = e.target.value; }));
+$('#setCoords').addEventListener('change', e => mutate(() => { state.settings.showCoords = e.target.checked; }));
+$('#bClear').onclick = () => {
+  if(!state.objects.length) return;
+  if(confirm(t('confirmClear')))
+    mutate(() => { state.objects = []; selected.clear(); });
+};
+
+/* ---------- Экспорт PNG ---------- */
+$('#bPng').onclick = () => {
+  const o = bandOut();
+  let x0 = -o - 5, y0 = -o - 7, x1 = N + o + 2, y1 = N + o + 2;
+  for(const ob of state.objects){
+    const b = bounds(ob);
+    x0 = Math.min(x0, b.x - 2); y0 = Math.min(y0, b.y - 2);
+    x1 = Math.max(x1, b.x + b.w + 2); y1 = Math.max(y1, b.y + b.h + 3);
+  }
+  const w = x1 - x0, h = y1 - y0;
+  const px = Math.min(20, 8000 / Math.max(w,h));
+  const W = Math.round(w * px), H = Math.round(h * px);
+  const str = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${x0} ${y0} ${w} ${h}"><defs>${DEFS}</defs><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#14171b"/>${worldSVG()}${objectsSVG(false)}</svg>`;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    c.getContext('2d').drawImage(img, 0, 0);
+    c.toBlob(blob => {
+      if(!blob){ toast(t('tPngFail')); return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${t('file')}-${new Date().toISOString().slice(0,10)}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      toast(t('tPngOk'), true);
+    }, 'image/png');
+  };
+  img.onerror = () => toast(t('tPngFail'));
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str);
+};
+
+/* ---------- Старт ---------- */
+applyStatic();
+setTool('select');
+renderAll();
+updateUndo();
+requestAnimationFrame(fit);
+})();
+</script>
+</body>
+</html>
