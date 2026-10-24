@@ -720,15 +720,15 @@ function pinchInfo(){
   const [a,b] = [...touches.values()];
   return { d: Math.hypot(a.x-b.x, a.y-b.y) || 1, mx:(a.x+b.x)/2, my:(a.y+b.y)/2 };
 }
-function placeAt(p, t){
-  if(t === 'ally' || t === 'enemy'){
+function placeAt(p, kind){
+  if(kind === 'ally' || kind === 'enemy'){
     const g = ghostPos(p), prob = baseProblem(g.x, g.y);
     if(prob){ toast(prob); return; }
-    const o = { id:uid(), type:'base', side:t, x:g.x, y:g.y, label:'' };
+    const o = { id:uid(), type:'base', side:kind, x:g.x, y:g.y, label:'' };
     mutate(() => { state.objects.push(o); selected = new Set([o.id]); });
     return;
   }
-  const o = t === 'text'
+  const o = kind === 'text'
     ? { id:uid(), type:'text', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defText'), color:lastColor.text, size:2 }
     : { id:uid(), type:'comment', x:Math.round(p.x), y:Math.round(p.y - 1), text:t('defComment'), bg:lastColor.bg, size:1.1 };
   setTool('select');
